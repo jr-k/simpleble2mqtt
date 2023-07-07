@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 
 import asyncio
-import math
 import yaml
+import math
+import time
 import json
 import signal
 import argparse
@@ -58,7 +59,7 @@ class SingleStateKalmanFilter():
         self.__current_prob_estimate = (1 - kalman_gain * self.__C) * predicted_prob_estimate
 
 #####################################
-#       Configuration Setup
+#       CONFIG: Setup
 #####################################
 
 if not os.path.isfile("config.yaml"):
@@ -69,17 +70,58 @@ if not os.path.isfile("config.yaml"):
 with open("config.yaml", "r") as file:
     config = yaml.safe_load(file)
 
-# Configuration du logging
+#####################################
+#       CONFIG: Logger
+#####################################
 logging.basicConfig(filename='output.log', encoding='utf-8', level=config['log_level'].upper())
 
-# MQTT configuration
+#####################################
+#       CONFIG: MQTT
+#####################################
 mqtt_config = config["mqtt"]
 client = mqtt_client.Client(mqtt_config["client_id"])
-if "username" in mqtt_config and "password" in mqtt_config:
+mqtt_connected = False
+if mqtt_config["username"] and mqtt_config["password"]:
     client.username_pw_set(mqtt_config["username"], mqtt_config["password"])
-client.connect(mqtt_config["broker"], mqtt_config["port"])
 
-# Beacon configuration
+def on_connect(client, userdata, flags, rc):
+    global mqtt_connected
+    if rc == 0:
+        log("Connexion au serveur MQTT établie.")
+        mqtt_connected = True
+    else:
+        log("Échec de la connexion au serveur MQTT. Code de retour : %d", rc)
+
+def on_log(self, client, userdata, level, buf):
+    if level != 16:
+        log(buf)
+
+def on_disconnect(self, client, userdata, rc):
+    global mqtt_connected
+    mqtt_connected = False
+    log("[MQTT] Disconnected from MQTT server")
+
+client.on_connect = on_connect
+client.on_log = on_log
+client.on_disconnect = on_disconnect
+
+def connect_mqtt():
+    global mqtt_connected
+    global client
+
+    while not mqtt_connected:
+        try:
+            client.connect(mqtt_config["broker"], mqtt_config["port"])
+            client.loop_start()
+            break
+        except ConnectionRefusedError:
+            log("Connexion au serveur MQTT refusée. Réessayer dans 5 secondes.")
+            time.sleep(5)
+    return client
+
+#####################################
+#       CONFIG: Ble vars
+#####################################
 devices_config = {device["address"]: device for device in config["devices"]}
 devices_to_track = [device.lower() for device in devices_config.keys()]
 tag_detected = {device: False for device in devices_to_track}
@@ -143,13 +185,18 @@ async def calibrate(maclist):
 #####################################
 
 def publish(message, subtopic = None):
+    connect_mqtt()
     topic = mqtt_config['topic']
 
     if subtopic:
         topic = f"{topic}/{subtopic}"
 
-    client.publish(f"{topic}", json.dumps(message), qos=mqtt_config['qos'])
+    log(topic)
+    log(json.dumps(message))
+    result, _ = client.publish(f"{topic}", json.dumps(message), qos=mqtt_config['qos'])
 
+    if result != mqtt_client.MQTT_ERR_SUCCESS:
+        log("Échec de la publication du message MQTT.")
 
 async def scan():
     scanner = BleakScanner(detection_callback=detection_callback)
@@ -220,6 +267,8 @@ def handle_exit(signal, frame):
 
 def main():
     global loop
+    global client
+    connect_mqtt()
     signal.signal(signal.SIGINT, handle_exit)
     signal.signal(signal.SIGTERM, handle_exit)
     exitevt.clear()
