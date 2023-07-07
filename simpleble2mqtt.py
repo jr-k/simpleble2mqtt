@@ -87,10 +87,10 @@ if mqtt_config["username"] and mqtt_config["password"]:
 def on_connect(client, userdata, flags, rc):
     global mqtt_connected
     if rc == 0:
-        log("Connexion au serveur MQTT établie.")
+        log("Connection to the MQTT server established.")
         mqtt_connected = True
     else:
-        log("Échec de la connexion au serveur MQTT. Code de retour : %d", rc)
+        log("Failed to connect to the MQTT server. Return code : %d", rc)
 
 def on_log(self, client, userdata, level, buf):
     if level != 16:
@@ -99,7 +99,7 @@ def on_log(self, client, userdata, level, buf):
 def on_disconnect(self, client, userdata, rc):
     global mqtt_connected
     mqtt_connected = False
-    log("[MQTT] Disconnected from MQTT server")
+    log("Disconnected from MQTT server")
 
 client.on_connect = on_connect
 client.on_log = on_log
@@ -115,7 +115,7 @@ def connect_mqtt():
             client.loop_start()
             break
         except ConnectionRefusedError:
-            log("Connexion au serveur MQTT refusée. Réessayer dans 5 secondes.")
+            log("Connection to the MQTT server refused. Retry in 5 seconds.")
             time.sleep(5)
     return client
 
@@ -191,12 +191,14 @@ def publish(message, subtopic = None):
     if subtopic:
         topic = f"{topic}/{subtopic}"
 
-    log(topic)
-    log(json.dumps(message))
+    # log(topic)
+    # log(json.dumps(message))
+
     result, _ = client.publish(f"{topic}", json.dumps(message), qos=mqtt_config['qos'])
 
     if result != mqtt_client.MQTT_ERR_SUCCESS:
-        log("Échec de la publication du message MQTT.")
+        log("Failed to publish the MQTT message, retrying...")
+        publish(message, subtopic)
 
 async def scan():
     scanner = BleakScanner(detection_callback=detection_callback)
@@ -261,7 +263,9 @@ def calculate_distance(device, rssi):
 
 def handle_exit(signal, frame):
     global loop
+    global client
     log(f"Received exit signal {signal}...", True)
+    client.disconnect()
     loop.stop()  # Stops the loop after the current iteration is complete
     exitevt.set()
 
