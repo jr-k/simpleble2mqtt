@@ -10,7 +10,7 @@ Every time a BLE beacon is received, it applies a Kalman filter to smooth the RS
 
 - On Debian based machines:
 ```
-apt-get install python3-pip python3-setuptools python3-dev libglib2.0-dev build-essential git
+sudo apt-get install python3-pip python3-setuptools python3-dev libglib2.0-dev build-essential git
 ```
 
 - Clone the repository
@@ -21,7 +21,7 @@ cd simpleble2mqtt
 
 - Install Python dependencies:
 ```
-pip3 install -r requirements.txt
+sudo pip3 install -r requirements.txt
 ```
 - Check bluetooth device state:
 ```
@@ -107,14 +107,11 @@ devices:
 1. Move the project folder to your prefered location
 2. Edit the `simpleble2mqtt.service` and set the right paths to `WorkingDirectory` and `ExecStart`
 3. Adjust your settings in `config.yaml`
-4. Install the service
+4. Install the service and start
 ```
-cp simpleble2mqtt.service /etc/systemd/system/
-systemctl enable simpleble2mqtt
-```
-5. You're ready to go
-```
-systemctl start simpleble2mqtt
+sudo cp simpleble2mqtt.service /etc/systemd/system/
+sudo systemctl enable simpleble2mqtt
+sudo systemctl start simpleble2mqtt
 ```
 
 ## Message format
