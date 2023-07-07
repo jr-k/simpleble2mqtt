@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import asyncio
-import time
 import math
 import yaml
 import json
@@ -15,15 +14,17 @@ import logging
 from bleak import BleakScanner
 from paho.mqtt import client as mqtt_client
 
+loop = None
 verbose = False
+exitevt = threading.Event()
 
 #####################################
 #       Helpers
 #####################################
 
-def log(msg):
+def log(msg, printer = False):
     global verbose
-    if verbose:
+    if verbose or printer:
         print(msg)
     logging.info(msg)
 
@@ -84,7 +85,6 @@ devices_to_track = [device.lower() for device in devices_config.keys()]
 tag_detected = {device: False for device in devices_to_track}
 rssi_values = {device: None for device in devices_to_track}
 status_interval_threshold = {device: 0 for device in devices_to_track}
-previous_status = {device: None for device in devices_to_track}
 
 #####################################
 #       ACTION: Calibrate
@@ -111,7 +111,7 @@ async def calibrate(maclist):
     devlist = {}
     calibrator_period = 10
 
-    while True:
+    while not exitevt.is_set():
         devices = await scanner.scan(period=calibrator_period)
         for dev in devices:
             if len(maclist) > 0 and dev.address.lower() not in maclist:
@@ -142,23 +142,18 @@ async def calibrate(maclist):
 #       ACTION: Scan
 #####################################
 
-def publish(status, device, message, subtopic = None):
-    if previous_status[device] is None or status != previous_status[device]:
-        topic = mqtt_config['topic']
+def publish(message, subtopic = None):
+    topic = mqtt_config['topic']
 
-        if subtopic:
-            topic = f"{topic}/{subtopic}"
+    if subtopic:
+        topic = f"{topic}/{subtopic}"
 
-        client.publish(f"{topic}", json.dumps(message), qos=mqtt_config['qos'])
-
-        previous_status[device] = status
-    else:
-        log(f"No changes for device {device} ({subtopic})")
-
+    client.publish(f"{topic}", json.dumps(message), qos=mqtt_config['qos'])
 async def scan(verbose):
     scanner = BleakScanner(detection_callback=detection_callback)
 
-    while True:
+    while not exitevt.is_set():
+        print('scan')
         devices = await scanner.start()
         await asyncio.sleep(config["interval"])
         await scanner.stop()
@@ -186,20 +181,20 @@ async def scan(verbose):
             if status:
                 if verbose:
                     log(f"Device {device} ({subtopic}) detected at distance: {message['distance']} meters")
-                publish(status, device, message, subtopic)
+                publish(message, subtopic)
                 status_interval_threshold[device] = 0  # Reset status count if tag detected
             else:
                 status_interval_threshold[device] += 1  # Increase status count
                 if status_interval_threshold[device] >= config["status_interval_threshold"]:
                     if verbose:
                         log(f"Device {device} ({subtopic}) not detected")
-                    publish(status, device, message, subtopic)
+                    publish(message, subtopic)
                     status_interval_threshold[device] = 0  # Reset status count after sending not detected message
                 else:
                     if verbose:
-                        currentCheck = status_interval_threshold[device]
-                        maxCheck = config["status_interval_threshold"]
-                        log(f"Device {device} ({subtopic}) not detected but waiting for more confirmations {currentCheck}/{maxCheck}")
+                        current_check = status_interval_threshold[device]
+                        max_check = config["status_interval_threshold"]
+                        log(f"Device {device} ({subtopic}) not detected but waiting for more confirmations {current_check}/{max_check}")
 
             tag_detected[device] = False
             rssi_values[device] = None
@@ -219,7 +214,18 @@ def calculate_distance(device, rssi):
 #       MAIN
 #####################################
 
+def handle_exit(signal, frame):
+    global loop
+    log(f"Received exit signal {signal}...", True)
+    loop.stop()  # Stops the loop after the current iteration is complete
+    exitevt.set()
+
 def main():
+    global loop
+    signal.signal(signal.SIGINT, handle_exit)
+    signal.signal(signal.SIGTERM, handle_exit)
+    exitevt.clear()
+
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-c", "--calibrate", help="Start calibrate for devices showing the avearage RSSI 1 meter away", action="store_true")
@@ -227,10 +233,11 @@ def main():
     parser.add_argument("-d", "--device", nargs='+', help="Filter by device mac when scanning", default=[])
     parser.add_argument("-v", "--verbose", help="Run in verbose mode", action="store_true", default=False)
     args = parser.parse_args()
+
     global verbose
     verbose = args.verbose
 
-    print("Simpleble2mqtt 1.0\n=========")
+    log("\n\nSimpleble2mqtt 1.0\n==================", True)
 
     if args.scan:
         log("Scanning...")
@@ -243,6 +250,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
