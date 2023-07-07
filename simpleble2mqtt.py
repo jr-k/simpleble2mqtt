@@ -10,23 +10,32 @@ import argparse
 import threading
 import sys
 import os
+import logging
 
 from bleak import BleakScanner
 from paho.mqtt import client as mqtt_client
 
+verbose = False
+
 #####################################
-#       Helper Classes
+#       Helpers
 #####################################
 
+def log(msg):
+    global verbose
+    if verbose:
+        print(msg)
+    logging.info(msg)
+
 class SingleStateKalmanFilter():
-    def __init__(self, A, B, C, x, P, Q, R):
-        self.__A = A
-        self.__B = B
-        self.__C = C
+    def __init__(self, a, b, c, x, p, q, r):
+        self.__A = a
+        self.__B = b
+        self.__C = c
         self.__current_state_estimate = x
-        self.__current_prob_estimate = P
-        self.__Q = Q
-        self.__R = R
+        self.__current_prob_estimate = p
+        self.__Q = q
+        self.__R = r
 
     def current_state(self):
         return self.__current_state_estimate
@@ -52,7 +61,7 @@ class SingleStateKalmanFilter():
 #####################################
 
 if not os.path.isfile("config.yaml"):
-    print("Configuration file config.yaml does not exist, copy from config.yaml.dist then run again")
+    log("Configuration file config.yaml does not exist, copy from config.yaml.dist then run again")
     sys.exit(1)
 
 # Load configuration from config.yaml
@@ -72,6 +81,7 @@ devices_to_track = [device.lower() for device in devices_config.keys()]
 tag_detected = {device: False for device in devices_to_track}
 rssi_values = {device: None for device in devices_to_track}
 status_interval_threshold = {device: 0 for device in devices_to_track}
+previous_status = {device: None for device in devices_to_track}
 
 #####################################
 #       ACTION: Calibrate
@@ -129,6 +139,19 @@ async def calibrate(maclist):
 #       ACTION: Scan
 #####################################
 
+def publish(status, device, message, subtopic = None):
+    if previous_status[device] is None or status != previous_status[device]:
+        topic = mqtt_config['topic']
+
+        if subtopic:
+            topic = f"{topic}/{subtopic}"
+
+        client.publish(f"{topic}", json.dumps(message))
+
+        previous_status[device] = status
+    else:
+        log(f"No changes for device {device} ({subtopic})")
+
 async def scan(verbose):
     scanner = BleakScanner(detection_callback=detection_callback)
 
@@ -140,28 +163,40 @@ async def scan(verbose):
         for device in devices_to_track:
             device = device.lower()
             subtopic = devices_config[device]['topic']
+            status = False
+            distance = -1
 
-            # Calculate distance and prepare message
+            # Vérifier si le tag a été détecté ou non
+            if tag_detected[device]:
+                distance = round(calculate_distance(device, rssi_values[device]), 2)
+                status = True
+                tag_detected[device] = False
+
             message = {
-                "detected": tag_detected[device],
-                "distance": -1 if not tag_detected[device] else round(calculate_distance(device, rssi_values[device]), 2),
+                "detected": status,
+                "distance": distance,
                 "rssi": rssi_values[device],
                 "payload": devices_config[device]['payload']
             }
 
             # Check if device has been detected
-            if tag_detected[device]:
+            if status:
                 if verbose:
-                    print(f"Device {device} ({subtopic}) detected at distance: {message['distance']} meters")
-                client.publish(f"{mqtt_config['topic']}/{subtopic}", json.dumps(message))
+                    log(f"Device {device} ({subtopic}) detected at distance: {message['distance']} meters")
+                publish(status, device, message, subtopic)
                 status_interval_threshold[device] = 0  # Reset status count if tag detected
             else:
                 status_interval_threshold[device] += 1  # Increase status count
                 if status_interval_threshold[device] >= config["status_interval_threshold"]:
                     if verbose:
-                        print(f"Device {device} ({subtopic}) not detected")
-                    client.publish(f"{mqtt_config['topic']}/{subtopic}", json.dumps(message))
+                        log(f"Device {device} ({subtopic}) not detected")
+                    publish(status, device, message, subtopic)
                     status_interval_threshold[device] = 0  # Reset status count after sending not detected message
+                else:
+                    if verbose:
+                        currentCheck = status_interval_threshold[device]
+                        maxCheck = config["status_interval_threshold"]
+                        log(f"Device {device} ({subtopic}) not detected but waiting for more confirmations {currentCheck}/{maxCheck}")
 
             tag_detected[device] = False
             rssi_values[device] = None
@@ -189,11 +224,17 @@ def main():
     parser.add_argument("-d", "--device", nargs='+', help="Filter by device mac when scanning", default=[])
     parser.add_argument("-v", "--verbose", help="Run in verbose mode", action="store_true", default=False)
     args = parser.parse_args()
+    global verbose
+    verbose = args.verbose
+
+    print("Simpleble2mqtt 1.0\n=========")
 
     if args.scan:
+        log("Scanning...")
         loop = asyncio.get_event_loop()
         loop.run_until_complete(scan(args.verbose))
     elif args.calibrate:
+        log("Calibrating...")
         loop = asyncio.get_event_loop()
         loop.run_until_complete(calibrate(args.device))
 
