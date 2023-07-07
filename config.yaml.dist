@@ -1,5 +1,5 @@
 interval: 5
-status_interval_threshold: 3
+status_interval_threshold: 10
 mqtt:
   broker: host
   port: 1883
