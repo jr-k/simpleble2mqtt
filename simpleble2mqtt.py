@@ -21,12 +21,12 @@ exitevt = threading.Event()
 #####################################
 #       Helpers
 #####################################
-
 def log(msg, printer = False):
+    logging.info(msg)
+
     global verbose
     if verbose or printer:
         print(msg)
-    logging.info(msg)
 
 class SingleStateKalmanFilter():
     def __init__(self, a, b, c, x, p, q, r):
@@ -149,7 +149,7 @@ def publish(message, subtopic = None):
         topic = f"{topic}/{subtopic}"
 
     client.publish(f"{topic}", json.dumps(message), qos=mqtt_config['qos'])
-async def scan(verbose):
+async def scan():
     scanner = BleakScanner(detection_callback=detection_callback)
 
     while not exitevt.is_set():
@@ -179,22 +179,19 @@ async def scan(verbose):
 
             # Check if device has been detected
             if status:
-                if verbose:
-                    log(f"Device {device} ({subtopic}) detected at distance: {message['distance']} meters")
+                log(f"Device {device} ({subtopic}) detected at distance: {message['distance']} meters")
                 publish(message, subtopic)
                 status_interval_threshold[device] = 0  # Reset status count if tag detected
             else:
                 status_interval_threshold[device] += 1  # Increase status count
                 if status_interval_threshold[device] >= config["status_interval_threshold"]:
-                    if verbose:
-                        log(f"Device {device} ({subtopic}) not detected")
+                    log(f"Device {device} ({subtopic}) not detected")
                     publish(message, subtopic)
                     status_interval_threshold[device] = 0  # Reset status count after sending not detected message
                 else:
-                    if verbose:
-                        current_check = status_interval_threshold[device]
-                        max_check = config["status_interval_threshold"]
-                        log(f"Device {device} ({subtopic}) not detected but waiting for more confirmations {current_check}/{max_check}")
+                    current_check = status_interval_threshold[device]
+                    max_check = config["status_interval_threshold"]
+                    log(f"Device {device} ({subtopic}) not detected but waiting for more confirmations {current_check}/{max_check}")
 
             tag_detected[device] = False
             rssi_values[device] = None
@@ -242,7 +239,7 @@ def main():
     if args.scan:
         log("Scanning...")
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(scan(args.verbose))
+        loop.run_until_complete(scan())
     elif args.calibrate:
         log("Calibrating...")
         loop = asyncio.get_event_loop()
