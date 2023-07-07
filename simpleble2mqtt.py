@@ -68,6 +68,9 @@ if not os.path.isfile("config.yaml"):
 with open("config.yaml", "r") as file:
     config = yaml.safe_load(file)
 
+# Configuration du logging
+logging.basicConfig(filename='output.log', encoding='utf-8', level=config['log_level'].upper())
+
 # MQTT configuration
 mqtt_config = config["mqtt"]
 client = mqtt_client.Client(mqtt_config["client_id"])

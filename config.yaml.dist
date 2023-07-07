@@ -1,3 +1,4 @@
+log_level: info
 interval: 5
 status_interval_threshold: 10
 mqtt:
