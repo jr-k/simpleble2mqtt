@@ -1,4 +1,4 @@
-[Units]
+[Unit]
 Description=Simpleble2mqtt - Ble beacon detection on MQTT
 
 [Service]
