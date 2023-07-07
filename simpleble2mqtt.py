@@ -153,7 +153,6 @@ async def scan():
     scanner = BleakScanner(detection_callback=detection_callback)
 
     while not exitevt.is_set():
-        print('scan')
         devices = await scanner.start()
         await asyncio.sleep(config["interval"])
         await scanner.stop()
