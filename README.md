@@ -140,9 +140,9 @@ systemctl start simpleble2mqtt
 ```
 sensor:
   - platform: mqtt_room
-    name: ble tag 1
-    device_id: ca:fe:ca:fe:ca:fe
-    state_topic: bletracker
+    name: ble_tag_user1
+    device_id: xx:xx:xx:xx:xx:xx
+    state_topic: ble_tag
     timeout: 60
     away_timeout: 360
 ```
@@ -154,9 +154,9 @@ sensor:
 ```
 binary_sensor:
   - platform: mqtt
-    name: Tracked device on
-    state_topic: "bletracker/livingroom/bletag1"
-    value_template: "{{ value_json.in_range }}"
+    name: Tracked device on user1
+    state_topic: "ble_tag/user1"
+    value_template: "{{ value_json.detected }}"
     payload_on: "True"
     payload_off: "False"
     off_delay: 120
