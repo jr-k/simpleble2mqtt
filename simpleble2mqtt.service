@@ -4,7 +4,7 @@ Description=Simpleble2mqtt - Ble beacon detection on MQTT
 [Service]
 Type=idle
 WorkingDirectory=/home/jrk/simpleble2mqtt
-ExecStart=/home/jrk/simpleble2mqtt/simpleble2mqtt.py
+ExecStart=/home/jrk/simpleble2mqtt/simpleble2mqtt.py -s
 Restart=always
 RestartSec=5
 
