@@ -1,10 +1,10 @@
 [Units]
-Description=Simple2mqtt - Ble beacon detection on MQTT
+Description=Simpleble2mqtt - Ble beacon detection on MQTT
 
 [Service]
 Type=idle
-WorkingDirectory=/home/jrk/simple2mqtt
-ExecStart=/home/jrk/simple2mqtt/simple2mqtt.py
+WorkingDirectory=/home/jrk/simpleble2mqtt
+ExecStart=/home/jrk/simpleble2mqtt/simpleble2mqtt.py
 Restart=always
 RestartSec=5
 
