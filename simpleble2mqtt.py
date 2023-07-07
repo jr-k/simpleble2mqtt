@@ -146,7 +146,7 @@ def publish(status, device, message, subtopic = None):
         if subtopic:
             topic = f"{topic}/{subtopic}"
 
-        client.publish(f"{topic}", json.dumps(message))
+        client.publish(f"{topic}", json.dumps(message), qos=mqtt_config['qos'])
 
         previous_status[device] = status
     else:
