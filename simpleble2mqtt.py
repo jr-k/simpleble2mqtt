@@ -149,6 +149,8 @@ def publish(message, subtopic = None):
         topic = f"{topic}/{subtopic}"
 
     client.publish(f"{topic}", json.dumps(message), qos=mqtt_config['qos'])
+
+
 async def scan():
     scanner = BleakScanner(detection_callback=detection_callback)
 
