@@ -1,0 +1,16 @@
+interval: 5
+status_interval_threshold: 3
+mqtt:
+  broker: host
+  port: 1883
+  username:
+  password:
+  client_id:
+  topic: ble_tag/status
+devices:
+  - address: xx:xx:xx:xx:xx:xx
+    topic: user1
+    payload: tag1
+    ble:
+      MR: -77.8746
+      N: 2.00544811
