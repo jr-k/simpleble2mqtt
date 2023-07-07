@@ -44,7 +44,7 @@ To discover devices as well as calculate the "**MR**" and the "**N**" constant, 
 python3 simpleble2mqtt.py -s -d [device-mac-here]
 ```
 
-***Note**: To see all the devices in range, remove the "--device [device-mac-here]" argument
+***Note**: To see all the devices in range, remove the `--device [device-mac-here]` argument
 
 Let that scan run for a while, and once the "distance" variable is close to 1 meter and "stable" between different samples, stop the scan by pressing "CTRL+C" and write down the "**MR**" and "**N**" variables.
 
