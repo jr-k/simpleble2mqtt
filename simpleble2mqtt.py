@@ -84,7 +84,7 @@ mqtt_connected = False
 if mqtt_config["username"] and mqtt_config["password"]:
     client.username_pw_set(mqtt_config["username"], mqtt_config["password"])
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, rc):
     global mqtt_connected
     if rc == 0:
         log("Connection to the MQTT server established.")
@@ -96,7 +96,7 @@ def on_log(self, client, userdata, level, buf):
     if level != 16:
         log(buf)
 
-def on_disconnect(self, client, userdata, rc):
+def on_disconnect(self, client, rc):
     global mqtt_connected
     mqtt_connected = False
     log("Disconnected from MQTT server")
